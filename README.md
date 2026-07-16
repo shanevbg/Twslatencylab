@@ -88,7 +88,7 @@ The peak of R(n) = exact arrival time of sound at the microphone.
 
 ## Download
 
-> APK coming soon in [Releases](../../releases)
+> You can Find the apk file in [Releases](../../releases)
 
 ---
 
