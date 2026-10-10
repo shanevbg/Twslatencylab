@@ -159,6 +159,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     AppButton("▶  Start Phase 1 — Device Baseline", BLUE, primary = true) {
                         vm.startBaseline()
                     }
+                    RunHistory(vm.history)
                 }
 
                 vm.phase == Phase.BASELINE || vm.phase == Phase.TWS -> {
@@ -263,6 +264,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     }
 
                     LiveLog(vm.log, maxHeight = 120)
+                    RunHistory(vm.history)
                     AppButton("Run New Test", BLUE, primary = true) { vm.reset() }
                     Spacer(Modifier.height(32.dp))
                 }
@@ -303,6 +305,37 @@ fun TrialSpreadCard(r: MeasurementResult) {
         ) {
             AppText("${"%.1f".format(fullLo)} – ${"%.1f".format(fullHi)} ms", Color(0xFFAAAAEE), 14.sp, fontFamily = MONO)
             AppText("full range", Color(0xFF8888AA), 12.sp)
+        }
+    }
+}
+
+@Composable
+fun RunHistory(runs: List<RunRecord>) {
+    if (runs.isEmpty()) return
+    Spacer(Modifier.height(8.dp))
+    InfoCard("SAVED RUNS") {
+        runs.forEach { run ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    AppText(run.whenLabel(), Color(0xFF8888AA), 11.sp)
+                    AppText(run.route.ifBlank { "headset" }, Color(0xFFAAAAEE), 12.sp)
+                    AppText(
+                        "headset ${"%.1f".format(run.headsetMs)}   speaker ${"%.1f".format(run.speakerMs)}   ${run.trials} trials",
+                        Color(0xFF555577), 11.sp
+                    )
+                }
+                AppText(
+                    "${"%.1f".format(run.netMs)} ms",
+                    latColor(run.netMs),
+                    16.sp,
+                    FontWeight.Bold,
+                    fontFamily = MONO
+                )
+            }
         }
     }
 }

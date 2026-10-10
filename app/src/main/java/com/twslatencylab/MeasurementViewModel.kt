@@ -21,6 +21,7 @@ class MeasurementViewModel : ViewModel() {
     var baseline by mutableStateOf<Double?>(null)
     var bsRaw    by mutableStateOf(listOf<Double>())
     var result   by mutableStateOf<MeasurementResult?>(null)
+    var history  by mutableStateOf(listOf<RunRecord>())
 
     val log = mutableStateListOf<LogEntry>()
 
@@ -28,10 +29,15 @@ class MeasurementViewModel : ViewModel() {
     val brainAdj = 15.0
 
     private var measurer: LatencyMeasurer? = null
+    private var store: RunStore? = null
+    private var phase2Route: String = ""
 
     fun init(context: Context) {
         if (measurer == null) {
-            measurer = LatencyMeasurer(context.applicationContext)
+            val app = context.applicationContext
+            measurer = LatencyMeasurer(app)
+            store = RunStore(app)
+            history = store?.load().orEmpty()
         }
     }
 
@@ -86,13 +92,17 @@ class MeasurementViewModel : ViewModel() {
         step  = 0
         heard = 0
         hint  = ""
+        phase2Route = ""
         push("━━━ PHASE 2 · HEADSET ━━━", LogType.HEADER)
 
         viewModelScope.launch(Dispatchers.Default) {
             val raw = mutableListOf<Double>()
             repeat(LatencyMeasurer.NUM_TRIALS) { i ->
                 step = i + 1
-                val d = m.runTrial(onLog = { msg -> push(msg) }, forceSpeaker = false)
+                val d = m.runTrial(onLog = { msg ->
+                    push(msg)
+                    if (msg.contains("[route]")) phase2Route = msg.substringAfter("[route]").trim()
+                }, forceSpeaker = false)
                 if (d != null) {
                     raw.add(d)
                     heard = raw.size
@@ -131,6 +141,19 @@ class MeasurementViewModel : ViewModel() {
                 "Net ${"%.1f".format(latMs)} ms  (phase2 ${"%.1f".format(twsMedMs)} − phase1 ${"%.1f".format(bsMedMs)})",
                 LogType.RESULT
             )
+
+            history = store?.add(
+                RunRecord(
+                    atMs = System.currentTimeMillis(),
+                    netMs = latMs,
+                    headsetMs = twsMedMs,
+                    speakerMs = bsMedMs,
+                    trials = raw.size,
+                    loMs = p25,
+                    hiMs = p75,
+                    route = phase2Route
+                )
+            ) ?: history
 
             result = MeasurementResult(
                 latMs               = latMs,
