@@ -19,6 +19,7 @@ class MeasurementViewModel : ViewModel() {
     var hint     by mutableStateOf("")
     var errorMsg by mutableStateOf("")
     var baseline by mutableStateOf<Double?>(null)
+    var freshBaseline by mutableStateOf<Double?>(null)
     var bsRaw    by mutableStateOf(listOf<Double>())
     var result   by mutableStateOf<MeasurementResult?>(null)
     var history  by mutableStateOf(listOf<RunRecord>())
@@ -55,6 +56,7 @@ class MeasurementViewModel : ViewModel() {
         step  = 0
         heard = 0
         hint  = ""
+        freshBaseline = null
         push("━━━ PHASE 1 · DEVICE BASELINE ━━━", LogType.HEADER)
 
         viewModelScope.launch(Dispatchers.Default) {
@@ -80,8 +82,28 @@ class MeasurementViewModel : ViewModel() {
                 return@launch
             }
 
-            baseline = LatencyMeasurer.median(raw)
+            val measured = LatencyMeasurer.median(raw)
+            freshBaseline = measured
+            baseline = measured
             bsRaw    = raw.toList()
+            phase = Phase.READY_TWS
+        }
+    }
+
+    fun recentBaselineMs(): List<Double> = history.take(5).map { it.speakerMs }
+
+    fun useFreshBaseline() {
+        baseline = freshBaseline ?: return
+    }
+
+    fun useRecentAverage() {
+        val recent = recentBaselineMs()
+        if (recent.isEmpty()) return
+        baseline = recent.average() / 1000.0
+        bsRaw = recent.map { it / 1000.0 }
+        if (phase == Phase.IDLE) {
+            log.clear()
+            hint = ""
             phase = Phase.READY_TWS
         }
     }
@@ -181,6 +203,7 @@ class MeasurementViewModel : ViewModel() {
         heard = 0
         hint = ""
         baseline = null
+        freshBaseline = null
         bsRaw = emptyList()
         result = null
         errorMsg = ""

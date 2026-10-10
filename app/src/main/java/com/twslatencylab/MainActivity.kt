@@ -156,8 +156,15 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                         PhaseRow("★", "Net Result", GREEN,
                             "Phase 2 minus Phase 1. The number is the measured difference.")
                     }
-                    AppButton("▶  Start Phase 1 — Device Baseline", BLUE, primary = true) {
+                    AppButton("▶  Measure a new baseline", BLUE, primary = true) {
                         vm.startBaseline()
+                    }
+                    val saved = vm.recentBaselineMs()
+                    if (saved.isNotEmpty()) {
+                        AppButton(
+                            "Use average of last ${saved.size} baseline${if (saved.size == 1) "" else "s"} (${"%.1f".format(saved.average())} ms)",
+                            CYAN
+                        ) { vm.useRecentAverage() }
                     }
                     RunHistory(vm.history)
                 }
@@ -201,15 +208,21 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                 vm.phase == Phase.READY_TWS -> {
                     Spacer(Modifier.height(16.dp))
                     val baselineVal = (vm.baseline ?: 0.0) * 1000
+                    val freshVal = vm.freshBaseline?.times(1000.0)
+                    val saved = vm.recentBaselineMs()
+                    val usingFresh = freshVal != null && kotlin.math.abs(baselineVal - freshVal) < 0.05
                     TCard(bg = Color(0xFF080E0C), borderColor = Color(0xFF0A2A1A)) {
-                        AppText("BASELINE CAPTURED", Color(0xFF1A5535), 10.sp, weight = FontWeight.Bold)
+                        AppText(
+                            if (usingFresh) "USING THIS MEASUREMENT" else "USING SAVED AVERAGE",
+                            Color(0xFF1A5535), 10.sp, weight = FontWeight.Bold
+                        )
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text("%.1f".format(baselineVal), fontFamily = SANS, 
+                            Text("%.1f".format(baselineVal), fontFamily = SANS,
                                 fontSize = 52.sp, fontWeight = FontWeight.Black, color = GREEN)
                             Text("ms", fontFamily = SANS, fontSize = 18.sp, color = Color(0xFF00AA66),
                                 modifier = Modifier.padding(bottom = 10.dp, start = 4.dp))
                         }
-                        
+
                         if (vm.hint.isNotEmpty()) {
                             Spacer(Modifier.height(12.dp))
                             AppText(vm.hint, YELLOW, 13.sp)
@@ -223,6 +236,19 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                                 AppText("Baseline is high enough that Phase 1 may have played through the earbuds.", YELLOW, 10.sp)
                             }
                         }
+                    }
+
+                    if (freshVal != null && saved.isNotEmpty()) {
+                        Spacer(Modifier.height(12.dp))
+                        AppText("Use this measurement, or the average of the last ${saved.size} saved baseline${if (saved.size == 1) "" else "s"}.", Color(0xFF8888AA), 12.sp)
+                        AppButton("Use this measurement (${"%.1f".format(freshVal)} ms)", BLUE, primary = usingFresh) {
+                            vm.useFreshBaseline()
+                        }
+                        AppButton(
+                            "Use average of last ${saved.size} (${"%.1f".format(saved.average())} ms)",
+                            CYAN,
+                            primary = !usingFresh
+                        ) { vm.useRecentAverage() }
                     }
 
                     Spacer(Modifier.height(12.dp))
