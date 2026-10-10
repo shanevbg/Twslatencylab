@@ -88,7 +88,7 @@ class MeasurementViewModel : ViewModel() {
             }
 
             if (raw.isEmpty() || baseline == null) {
-                errorMsg = "No signal detected from earbuds."
+                errorMsg = "No click reached the phone microphone. Hold an earcup against the bottom of the phone."
                 phase = Phase.ERROR
                 return@launch
             }

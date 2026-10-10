@@ -125,6 +125,8 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                         AppText("⚠  Something went wrong", RED, 14.sp, FontWeight.Bold)
                         Spacer(Modifier.height(8.dp))
                         AppText(vm.errorMsg, Color(0xFFCC6677), 12.sp)
+                        Spacer(Modifier.height(12.dp))
+                        LiveLog(vm.log, maxHeight = 220)
                         Spacer(Modifier.height(16.dp))
                         AppButton("Try Again", RED) { vm.reset() }
                     }

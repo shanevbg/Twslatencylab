@@ -189,9 +189,16 @@ class LatencyMeasurer(private val context: Context) {
             if (route != null) player.setPreferredDevice(route)
             onLog("  [route] ${routeLabel(route)}")
 
-            player.write(beep, 0, beep.size, AudioTrack.WRITE_BLOCKING)
+            // setPreferredDevice tears the track down. The click has to be written after that.
+            val wrote = player.write(beep, 0, beep.size, AudioTrack.WRITE_BLOCKING)
+            if (wrote != beep.size) onLog("  [warn] wrote $wrote of ${beep.size}")
 
-            // Minimal sleep to let the system stabilize, but not enough to freeze UI
+            // A plugged-in headset becomes the default mic, and that mic cannot hear the earcup.
+            val mic = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
+                .firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_MIC }
+            if (mic != null) recorder.setPreferredDevice(mic)
+            onLog("  [mic] ${mic?.productName ?: "default"}")
+
             Thread.sleep(50)
 
             recorder.startRecording()
