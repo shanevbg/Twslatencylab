@@ -174,11 +174,15 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                             if (isBaseline) "🔊  Click playing through phone speaker" else "🎧  Click routing to the connected headset",
                             Color(0xFF9999DD), 14.sp
                         )
+                        if (vm.hint.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            AppText(vm.hint, YELLOW, 13.sp)
+                        }
                         Spacer(Modifier.height(16.dp))
 
                         val progress = vm.step.toFloat() / LatencyMeasurer.NUM_TRIALS
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            AppText("Trial ${vm.step} of ${LatencyMeasurer.NUM_TRIALS}", Color(0xFF33336A), 11.sp)
+                            AppText("Trial ${vm.step} of ${LatencyMeasurer.NUM_TRIALS} · heard ${vm.heard}", Color(0xFF33336A), 11.sp)
                             AppText("${(progress * 100).toInt()}%", Color(0xFF33336A), 11.sp)
                         }
                         Spacer(Modifier.height(4.dp))
@@ -205,6 +209,11 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                                 modifier = Modifier.padding(bottom = 10.dp, start = 4.dp))
                         }
                         
+                        if (vm.hint.isNotEmpty()) {
+                            Spacer(Modifier.height(12.dp))
+                            AppText(vm.hint, YELLOW, 13.sp)
+                        }
+
                         if (baselineVal > 150.0) {
                             Spacer(Modifier.height(12.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {

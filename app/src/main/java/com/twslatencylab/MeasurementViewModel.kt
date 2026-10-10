@@ -15,6 +15,8 @@ class MeasurementViewModel : ViewModel() {
 
     var phase    by mutableStateOf(Phase.IDLE)
     var step     by mutableStateOf(0)
+    var heard    by mutableStateOf(0)
+    var hint     by mutableStateOf("")
     var errorMsg by mutableStateOf("")
     var baseline by mutableStateOf<Double?>(null)
     var bsRaw    by mutableStateOf(listOf<Double>())
@@ -45,17 +47,25 @@ class MeasurementViewModel : ViewModel() {
         log.clear()
         phase = Phase.BASELINE
         step  = 0
+        heard = 0
+        hint  = ""
         push("━━━ PHASE 1 · DEVICE BASELINE ━━━", LogType.HEADER)
-        
+
         viewModelScope.launch(Dispatchers.Default) {
             val raw = mutableListOf<Double>()
             repeat(LatencyMeasurer.NUM_TRIALS) { i ->
                 step = i + 1
                 val d = m.runTrial(onLog = { msg -> push(msg) }, forceSpeaker = true)
-                if (d != null) raw.add(d)
-                
-                yield() 
-                delay(300) 
+                if (d != null) {
+                    raw.add(d)
+                    heard = raw.size
+                    hint = ""
+                    delay(300)
+                } else {
+                    hint = "No click heard. Uncover the phone microphone. This baseline is still running."
+                    delay(2500)
+                }
+                yield()
             }
 
             if (raw.isEmpty()) {
@@ -74,22 +84,30 @@ class MeasurementViewModel : ViewModel() {
         val m = measurer ?: return
         phase = Phase.TWS
         step  = 0
-        push("━━━ PHASE 2 · TWS BLUETOOTH ━━━", LogType.HEADER)
+        heard = 0
+        hint  = ""
+        push("━━━ PHASE 2 · HEADSET ━━━", LogType.HEADER)
 
         viewModelScope.launch(Dispatchers.Default) {
             val raw = mutableListOf<Double>()
             repeat(LatencyMeasurer.NUM_TRIALS) { i ->
                 step = i + 1
                 val d = m.runTrial(onLog = { msg -> push(msg) }, forceSpeaker = false)
-                if (d != null) raw.add(d)
-                
-                yield() 
-                delay(300)
+                if (d != null) {
+                    raw.add(d)
+                    heard = raw.size
+                    hint = ""
+                    delay(300)
+                } else {
+                    hint = "No click heard. Move an earcup onto the phone microphone. The speaker baseline is kept."
+                    delay(2500)
+                }
+                yield()
             }
 
-            if (raw.isEmpty() || baseline == null) {
-                errorMsg = "No click reached the phone microphone. Hold an earcup against the bottom of the phone."
-                phase = Phase.ERROR
+            if (raw.isEmpty()) {
+                hint = "No click reached the phone microphone. Move an earcup against the bottom of the phone, then run the headset test again. The speaker baseline is kept."
+                phase = Phase.READY_TWS
                 return@launch
             }
 
@@ -108,6 +126,7 @@ class MeasurementViewModel : ViewModel() {
             val p25 = LatencyMeasurer.percentile(nets, 25.0)
             val p75 = LatencyMeasurer.percentile(nets, 75.0)
 
+            hint = ""
             push(
                 "Net ${"%.1f".format(latMs)} ms  (phase2 ${"%.1f".format(twsMedMs)} − phase1 ${"%.1f".format(bsMedMs)})",
                 LogType.RESULT
@@ -136,6 +155,8 @@ class MeasurementViewModel : ViewModel() {
     fun reset() {
         phase = Phase.IDLE
         step = 0
+        heard = 0
+        hint = ""
         baseline = null
         bsRaw = emptyList()
         result = null
