@@ -134,8 +134,8 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     Spacer(Modifier.height(16.dp))
                     InfoCard("🎙  Microphone required") {
                         AppText(
-                            "This app plays a sharp click and records when it arrives through " +
-                            "your speaker, then through your Bluetooth earbuds.",
+                            "This app plays a click and records when it arrives through " +
+                            "the phone speaker, then through a wired or Bluetooth headset.",
                             Color(0xFF8888BB), 13.sp
                         )
                     }
@@ -149,8 +149,8 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     InfoCard("📡  How it works") {
                         PhaseRow("1", "Device Baseline", BLUE,
                             "Measures raw device audio pipeline overhead.")
-                        PhaseRow("2", "TWS Bluetooth Test", CYAN,
-                            "Measures full BT path including codec processing.")
+                        PhaseRow("2", "Headset Test", CYAN,
+                            "Wired headset if one is plugged in, otherwise Bluetooth.")
                         PhaseRow("★", "Net Result", GREEN,
                             "Phase 2 minus Phase 1. The number is the measured difference.")
                     }
@@ -169,7 +169,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                         )
                         Spacer(Modifier.height(12.dp))
                         AppText(
-                            if (isBaseline) "🔊  Click playing through phone speaker" else "🎧  Click routing Bluetooth → earbud",
+                            if (isBaseline) "🔊  Click playing through phone speaker" else "🎧  Click routing to the connected headset",
                             Color(0xFF9999DD), 14.sp
                         )
                         Spacer(Modifier.height(16.dp))
@@ -214,7 +214,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    AppButton("▶  Start Phase 2 — TWS Test", GREEN, primary = true) { vm.startTWS() }
+                    AppButton("▶  Start Phase 2 — Headset Test", GREEN, primary = true) { vm.startTWS() }
                 }
 
                 vm.phase == Phase.DONE && vm.result != null -> {
@@ -245,7 +245,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                     Spacer(Modifier.height(12.dp))
 
                     InfoCard("LATENCY BREAKDOWN") {
-                        ResultRow("Phase 2 (earbuds)", "${"%.1f".format(r.twsMedianMs)} ms")
+                        ResultRow("Phase 2 (headset)", "${"%.1f".format(r.twsMedianMs)} ms")
                         ResultRow("Phase 1 (phone speaker)", "− ${"%.1f".format(r.baselineMs)} ms", color = ORANGE, dim = true)
                         Divider(color = Color(0xFF181830), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
                         ResultRow("Measured net", "= ${"%.1f".format(r.latMs)} ms", color = GREEN, bold = true)

@@ -151,8 +151,9 @@ class LatencyMeasurer(private val context: Context) {
             .setBufferSizeInBytes(inBufSize)
             .build()
 
-        val usage      = if (forceSpeaker) AudioAttributes.USAGE_ALARM else AudioAttributes.USAGE_MEDIA
-        val streamType = if (forceSpeaker) AudioManager.STREAM_ALARM   else AudioManager.STREAM_MUSIC
+        // Same stream for both phases. Alarm-vs-media was a second latency of its own.
+        val usage      = AudioAttributes.USAGE_MEDIA
+        val streamType = AudioManager.STREAM_MUSIC
 
         val player = AudioTrack.Builder()
             .setAudioAttributes(
@@ -186,7 +187,7 @@ class LatencyMeasurer(private val context: Context) {
 
             val route = preferredOutput(audioManager, forceSpeaker)
             if (route != null) player.setPreferredDevice(route)
-            onLog("  [route] ${if (forceSpeaker) "speaker" else "bluetooth"} ${route?.productName ?: "default"}")
+            onLog("  [route] ${routeLabel(route)}")
 
             player.write(beep, 0, beep.size, AudioTrack.WRITE_BLOCKING)
 
@@ -246,12 +247,30 @@ class LatencyMeasurer(private val context: Context) {
         return if (forceSpeaker) {
             outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
         } else {
-            outputs.firstOrNull {
-                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                    it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
-                    it.type == AudioDeviceInfo.TYPE_HEARING_AID
-            }
+            // Wired wins when it is plugged in, so a wired check is not stolen by a paired headset.
+            outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET }
+                ?: outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
+                ?: outputs.firstOrNull {
+                    it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                        it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                        it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                        it.type == AudioDeviceInfo.TYPE_HEARING_AID
+                }
         }
+    }
+
+    private fun routeLabel(device: AudioDeviceInfo?): String {
+        if (device == null) return "default"
+        val kind = when (device.type) {
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "speaker"
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES, AudioDeviceInfo.TYPE_WIRED_HEADSET -> "wired"
+            AudioDeviceInfo.TYPE_USB_HEADSET -> "usb"
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            AudioDeviceInfo.TYPE_BLE_HEADSET,
+            AudioDeviceInfo.TYPE_BLE_SPEAKER,
+            AudioDeviceInfo.TYPE_HEARING_AID -> "bluetooth"
+            else -> "output"
+        }
+        return "$kind ${device.productName}"
     }
 }
