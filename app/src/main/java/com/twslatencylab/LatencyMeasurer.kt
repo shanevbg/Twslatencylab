@@ -73,7 +73,7 @@ class LatencyMeasurer(private val context: Context) {
         val tLen = template.size
         
         val searchFrom = PRE_RECORD_SAMPLES + (SAMPLE_RATE * 0.010).toInt()
-        val searchTo   = min(recSize - tLen, PRE_RECORD_SAMPLES + (SAMPLE_RATE * 0.800).toInt())
+        val searchTo   = min(recSize - tLen, PRE_RECORD_SAMPLES + (SAMPLE_RATE * 1.200).toInt())
         
         if (searchFrom >= searchTo) return null
 
@@ -183,8 +183,10 @@ class LatencyMeasurer(private val context: Context) {
 
         try {
             audioManager.setStreamVolume(streamType, maxVolume, 0)
-            audioManager.mode             = AudioManager.MODE_NORMAL
-            audioManager.isSpeakerphoneOn = false
+
+            val route = preferredOutput(audioManager, forceSpeaker)
+            if (route != null) player.setPreferredDevice(route)
+            onLog("  [route] ${if (forceSpeaker) "speaker" else "bluetooth"} ${route?.productName ?: "default"}")
 
             player.write(beep, 0, beep.size, AudioTrack.WRITE_BLOCKING)
 
@@ -237,5 +239,19 @@ class LatencyMeasurer(private val context: Context) {
         }
 
         result
+    }
+
+    private fun preferredOutput(audioManager: AudioManager, forceSpeaker: Boolean): AudioDeviceInfo? {
+        val outputs = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        return if (forceSpeaker) {
+            outputs.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+        } else {
+            outputs.firstOrNull {
+                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                    it.type == AudioDeviceInfo.TYPE_BLE_SPEAKER ||
+                    it.type == AudioDeviceInfo.TYPE_HEARING_AID
+            }
+        }
     }
 }

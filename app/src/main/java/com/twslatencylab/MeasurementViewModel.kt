@@ -11,10 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
-
 class MeasurementViewModel : ViewModel() {
 
     var phase    by mutableStateOf(Phase.IDLE)
@@ -26,11 +22,8 @@ class MeasurementViewModel : ViewModel() {
 
     val log = mutableStateListOf<LogEntry>()
 
-    var gameComp by mutableStateOf(70.0) 
+    var gameComp by mutableStateOf(70.0)
     val brainAdj = 15.0
-
-    // Gaming Mode Toggle State
-    var isGamingMode by mutableStateOf(false)
 
     private var measurer: LatencyMeasurer? = null
 
@@ -102,51 +95,29 @@ class MeasurementViewModel : ViewModel() {
 
             val bsMed  = baseline!!
             val twsMed = LatencyMeasurer.median(raw)
-            
+
             val bsMedMs  = bsMed * 1000.0
             val twsMedMs = twsMed * 1000.0
 
-            // The DSP Tax Bypass for Modern Devices (A17 Fix)
-            val effectiveBaselineMs = if (isGamingMode && bsMedMs > 40.0) {
-                push("Notice: Capping baseline deduction due to Gaming Mode BT path.", LogType.INFO)
-                min(bsMedMs, 25.0)
-            } else {
-                bsMedMs
-            }
-
-            // 1. Calculate relative latency
-            val latMs  = max(0.0, twsMedMs - effectiveBaselineMs)
-            val nets   = raw.map { max(0.0, (it * 1000.0) - effectiveBaselineMs) }
-            
-            // 2. Dynamic A2DP Buffer Estimation
-            val stdDev = sqrt(nets.map { (it - latMs) * (it - latMs) }.average())
-            
-            val a2dpBuffer = if (isGamingMode) {
-                20.0 
-            } else {
-                when {
-                    stdDev < 5.0  -> 150.0
-                    stdDev < 15.0 -> 200.0
-                    stdDev < 30.0 -> 220.0
-                    else          -> 240.0
-                }
-            }
-
-            // 3. App/OS Processing Tax
-            val calibrationOffset = if (isGamingMode) 15.0 else 35.0 
-            
-            // Final Corrected Latency
-            val correctedLatMs = max(0.0, latMs - a2dpBuffer - calibrationOffset)
+            // Net is the measured difference. Nothing else is subtracted:
+            // the old A2DP/OS constants were larger than this difference and
+            // the screen clamped the result to 0.
+            val latMs = twsMedMs - bsMedMs
+            val nets  = raw.map { (it * 1000.0) - bsMedMs }
 
             val p25 = LatencyMeasurer.percentile(nets, 25.0)
             val p75 = LatencyMeasurer.percentile(nets, 75.0)
-            val perceived = max(0.0, correctedLatMs - gameComp - brainAdj)
+
+            push(
+                "Net ${"%.1f".format(latMs)} ms  (phase2 ${"%.1f".format(twsMedMs)} − phase1 ${"%.1f".format(bsMedMs)})",
+                LogType.RESULT
+            )
 
             result = MeasurementResult(
                 latMs               = latMs,
-                a2dpBufferMs        = a2dpBuffer,
-                systemCalibrationMs = calibrationOffset,
-                correctedLatMs      = correctedLatMs,
+                a2dpBufferMs        = 0.0,
+                systemCalibrationMs = 0.0,
+                correctedLatMs      = latMs,
                 loMs                = p25,
                 hiMs                = p75,
                 twsMedianMs         = twsMedMs,
@@ -156,7 +127,7 @@ class MeasurementViewModel : ViewModel() {
                 bsDelaysMs          = bsRaw.map { it * 1000.0 },
                 gameCompMs          = gameComp,
                 brainAdjMs          = brainAdj,
-                perceivedLatencyMs  = perceived
+                perceivedLatencyMs  = latMs
             )
             phase = Phase.DONE
         }

@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlin.math.max
 
 // ── Native Font Setup ────────────────────────────────────────────────────────
 val MONO = FontFamily.Monospace
@@ -153,7 +152,7 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                         PhaseRow("2", "TWS Bluetooth Test", CYAN,
                             "Measures full BT path including codec processing.")
                         PhaseRow("★", "Net Result", GREEN,
-                            "Calculates true latency using jitter-based buffer estimation.")
+                            "Phase 2 minus Phase 1. The number is the measured difference.")
                     }
                     AppButton("▶  Start Phase 1 — Device Baseline", BLUE, primary = true) {
                         vm.startBaseline()
@@ -204,40 +203,13 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                                 modifier = Modifier.padding(bottom = 10.dp, start = 4.dp))
                         }
                         
-                        if (baselineVal > 40.0) {
+                        if (baselineVal > 150.0) {
                             Spacer(Modifier.height(12.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("⚠", color = YELLOW, fontSize = 14.sp)
                                 Spacer(Modifier.width(8.dp))
-                                AppText("High baseline detected. Turn off Dolby Atmos/DSP for better accuracy.", YELLOW, 10.sp)
+                                AppText("Baseline is high enough that Phase 1 may have played through the earbuds.", YELLOW, 10.sp)
                             }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    
-                    // GAMING MODE TOGGLE CARD
-                    TCard(bg = CARD) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                AppText("GAMING MODE", CYAN, 12.sp, FontWeight.Bold)
-                                Spacer(Modifier.height(4.dp))
-                                AppText("Turn this ON if your earbuds are currently in 'Game Mode' or 'Low Latency Mode'.", DIMTEXT, 11.sp)
-                            }
-                            Switch(
-                                checked = vm.isGamingMode,
-                                onCheckedChange = { vm.isGamingMode = it },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = CYAN, 
-                                    checkedTrackColor = CYAN.copy(alpha = 0.3f),
-                                    uncheckedThumbColor = DIMTEXT,
-                                    uncheckedTrackColor = Color(0xFF111122)
-                                )
-                            )
                         }
                     }
 
@@ -247,14 +219,14 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
 
                 vm.phase == Phase.DONE && vm.result != null -> {
                     val r = vm.result!!
-                    val col = latColor(r.correctedLatMs)
-                    
+                    val col = latColor(r.latMs)
+
                     Spacer(Modifier.height(16.dp))
 
                     TCard(bg = Color(0xFF090910), borderColor = col.copy(alpha = 0.3f)) {
-                        AppText("ESTIMATED TRUE LATENCY", Color(0xFF555588), 11.sp, letterSpacing = 3.sp, weight = FontWeight.Bold)
+                        AppText("MEASURED NET LATENCY", Color(0xFF555588), 11.sp, letterSpacing = 3.sp, weight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.Bottom) {
-                            Text("~${r.correctedLatMs.toInt()}", fontFamily = SANS, 
+                            Text("%.1f".format(r.latMs), fontFamily = SANS,
                                 fontSize = 72.sp, fontWeight = FontWeight.Black, color = col)
                             Text("ms", fontFamily = SANS, fontSize = 22.sp, color = col.copy(0.6f),
                                 modifier = Modifier.padding(bottom = 16.dp, start = 8.dp))
@@ -262,44 +234,21 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(6.dp).background(DIMTEXT, RoundedCornerShape(50)))
                             Spacer(Modifier.width(8.dp))
-                            AppText("Absolute Earbud Measurement: ${r.twsMedianMs.toInt()}ms", DIMTEXT, 12.sp)
-                        }
-                    }
-
-                    if (r.baselineMs > 40.0 && !vm.isGamingMode) {
-                        Spacer(Modifier.height(12.dp))
-                        TCard(bg = Color(0xFF1A1500), borderColor = YELLOW.copy(alpha = 0.3f)) {
-                            Row {
-                                Text("⚠", color = YELLOW, fontSize = 18.sp, modifier = Modifier.padding(top = 2.dp))
-                                Spacer(Modifier.width(10.dp))
-                                Column {
-                                    AppText("HIGH BASELINE DETECTED", YELLOW, 10.sp, FontWeight.Bold, letterSpacing = 1.sp)
-                                    Spacer(Modifier.height(4.dp))
-                                    AppText("Your device speaker delay (${r.baselineMs.toInt()}ms) is unusually high. This is often caused by Dolby Atmos or system equalizers. Turn them off for the most accurate calculation.", Color(0xFFCCAA66), 11.sp)
-                                }
-                            }
+                            AppText("Phase 2 minus Phase 1. Nothing else is subtracted.", DIMTEXT, 12.sp)
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
 
-                    LabComparisonCard(realWorldMs = r.correctedLatMs)
+                    TrialSpreadCard(r)
 
                     Spacer(Modifier.height(12.dp))
 
                     InfoCard("LATENCY BREAKDOWN") {
-                        ResultRow("Phase 2 (TWS Absolute)", "${r.twsMedianMs.toInt()} ms")
-                        ResultRow("Phase 1 (Device Baseline)", "− ${r.baselineMs.toInt()} ms", color = ORANGE, dim = true)
-                        ResultRow("Net Bluetooth Delay", "= ${r.latMs.toInt()} ms", color = Color(0xFF8888CC))
-                        
-                        // Dynamically update the label based on the toggle
-                        val bufferLabel = if (vm.isGamingMode) "Fast Path Buffer Estimate" else "Android A2DP Buffer Estimate"
-                        ResultRow(bufferLabel, "− ${r.a2dpBufferMs.toInt()} ms", color = ORANGE, dim = true)
-                        
-                        ResultRow("App & OS Processing", "− ${r.systemCalibrationMs.toInt()} ms", color = ORANGE, dim = true)
-                        
+                        ResultRow("Phase 2 (earbuds)", "${"%.1f".format(r.twsMedianMs)} ms")
+                        ResultRow("Phase 1 (phone speaker)", "− ${"%.1f".format(r.baselineMs)} ms", color = ORANGE, dim = true)
                         Divider(color = Color(0xFF181830), thickness = 1.dp, modifier = Modifier.padding(vertical = 8.dp))
-                        ResultRow("True Earbud Hardware", "~ ${r.correctedLatMs.toInt()} ms", color = GREEN, bold = true)
+                        ResultRow("Measured net", "= ${"%.1f".format(r.latMs)} ms", color = GREEN, bold = true)
                     }
 
                     LiveLog(vm.log, maxHeight = 120)
@@ -314,57 +263,36 @@ fun TWSApp(vm: MeasurementViewModel = viewModel()) {
 // ── UI Components ─────────────────────────────────────────────────────────────
 
 @Composable
-fun LabComparisonCard(realWorldMs: Double) {
-    val labEstimate = max(0, (realWorldMs - 80).toInt())
+fun TrialSpreadCard(r: MeasurementResult) {
+    val fullLo = r.netDelaysMs.minOrNull() ?: r.latMs
+    val fullHi = r.netDelaysMs.maxOrNull() ?: r.latMs
 
     TCard(
-        bg = Color(0xFF0A0A15), 
+        bg = Color(0xFF0A0A15),
         borderColor = Color(0xFF1F1F3D)
     ) {
-        Column(modifier = Modifier.padding(bottom = 12.dp)) {
-            AppText("◈ LABORATORY RECONSTRUCTION", CYAN, 11.sp, FontWeight.Bold, letterSpacing = 2.sp)
-            Spacer(Modifier.height(8.dp))
-            AppText(
-                "This is your TWS or Earphone hardware's capability under every possible Ideal conditions. " +
-                "The numbers you see from brand are measured under different specific conditions and cannot " +
-                "match with your day-to-day life usage. With mobile phone's condition latency will stay always " +
-                "according to result.",
-                Color(0xFF7777AA), 11.sp, textAlign = TextAlign.Left
-            )
-        }
-
-        Divider(color = Color(0xFF181830), thickness = 1.dp)
-        Spacer(Modifier.height(14.dp))
-        
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            LabPoint("• Zero Protocol Tax", "Removes AAC/SBC encoding & travel jitter (~60ms)")
-            LabPoint("• Direct Chip Path", "Bypassing Android System Mixer (~20ms)")
-        }
-        
-        Spacer(Modifier.height(16.dp))
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AppText("LAB TEST RESULT COULD BE:", Color(0xFF8888AA), 12.sp)
-            AppText("~ $labEstimate ms", GREEN, 18.sp, FontWeight.ExtraBold, fontFamily = MONO)
-        }
-        
+        AppText("TRIAL SPREAD", CYAN, 11.sp, FontWeight.Bold, letterSpacing = 2.sp)
         Spacer(Modifier.height(8.dp))
         AppText(
-            "This reflects the raw hardware capability before the 'Smartphone Tax' is applied.",
-            Color(0xFF444466), 10.sp
+            "Middle half of the net delays, then the full range. ${r.validTrials} trials kept.",
+            Color(0xFF7777AA), 11.sp
         )
-    }
-}
-
-@Composable
-fun LabPoint(title: String, desc: String) {
-    Column {
-        AppText(title, Color(0xFFAAAAEE), 12.sp, weight = FontWeight.Bold, fontFamily = MONO)
-        AppText(desc, Color(0xFF555588), 10.sp, modifier = Modifier.padding(start = 12.dp))
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            AppText("${"%.1f".format(r.loMs)} – ${"%.1f".format(r.hiMs)} ms", GREEN, 16.sp, FontWeight.Bold, fontFamily = MONO)
+            AppText("middle half", Color(0xFF8888AA), 12.sp)
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            AppText("${"%.1f".format(fullLo)} – ${"%.1f".format(fullHi)} ms", Color(0xFFAAAAEE), 14.sp, fontFamily = MONO)
+            AppText("full range", Color(0xFF8888AA), 12.sp)
+        }
     }
 }
 
